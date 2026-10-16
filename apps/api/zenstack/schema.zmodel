@@ -1,0 +1,106 @@
+datasource db {
+    provider = 'postgresql'
+    url = env('DATABASE_URL')
+}
+
+plugin policy {
+    provider = '@zenstackhq/plugin-policy'
+}
+
+/**
+Use RBAC permission for table like: 
+permission = [
+    {model: "User", actions: ["create", "update", "delete"]}
+]
+
+use for model like: 
+
+model User {
+    ... 
+    @@allow('all', auth().permissions?[model == currentModel() && currentOperation() in actions])
+    ...
+}
+
+ */
+
+type Permission {
+    model   String // Model of this schema to control access
+    actions String[] // list of actions to allow
+}
+
+/// User model
+model User {
+    id            String       @id @default(cuid())
+    email         String       @unique @email @length(6, 32)
+    name          String
+    emailVerified Boolean      @default(false)
+    image         String?
+    createdAt     DateTime     @default(now())
+    updatedAt     DateTime     @default(now()) @updatedAt
+    role          String?
+    banned        Boolean?     @default(false)
+    banReason     String?
+    banExpires    DateTime?
+    permissions   Permission[] @json
+    sessions      Session[]
+    accounts      Account[]
+
+    @@map('user')
+}
+
+model Session {
+    id             String   @id
+    expiresAt      DateTime
+    token          String   @unique
+    createdAt      DateTime @default(now())
+    updatedAt      DateTime @updatedAt
+    ipAddress      String?
+    userAgent      String?
+    userId         String
+    user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+    impersonatedBy String?
+
+    @@map('session')
+}
+
+model Account {
+    id                    String    @id
+    accountId             String
+    providerId            String
+    userId                String
+    user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+    accessToken           String?
+    refreshToken          String?
+    idToken               String?
+    accessTokenExpiresAt  DateTime?
+    refreshTokenExpiresAt DateTime?
+    scope                 String?
+    password              String?
+    createdAt             DateTime  @default(now())
+    updatedAt             DateTime  @updatedAt
+
+    @@map('account')
+}
+
+model Verification {
+    id         String   @id
+    identifier String
+    value      String
+    expiresAt  DateTime
+    createdAt  DateTime @default(now())
+    updatedAt  DateTime @default(now()) @updatedAt
+
+    @@map('verification')
+}
+
+model Jwks {
+    id         String    @id
+    publicKey  String
+    privateKey String
+    createdAt  DateTime
+    expiresAt  DateTime?
+    alg        String?
+    crv        String?
+
+    @@map('jwks')
+}
